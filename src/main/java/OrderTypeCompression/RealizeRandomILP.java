@@ -4,25 +4,23 @@ import gurobi.GRB;
 import gurobi.GRB.IntParam;
 import gurobi.GRBEnv;
 import gurobi.GRBException;
-import gurobi.GRBLinExpr;
 import gurobi.GRBModel;
 import gurobi.GRBVar;
 import java.util.Random;
 
-public class RandomILP implements PointsRealization {
+public class RealizeRandomILP implements PointsRealization {
 
   public static final String name = "RandomILP";
+  private static double INF = 1 << 16;
   private static final double EPSILON = 1.0 - 1e-1;
   private static final boolean OUTPUT_FLAG = false;
-  private static double INF = 1 << 16;
   private final Random random;
   private int n;
   private Orientations orientations;
   private long[] x;
   private long[] y;
-  private Points ans;
 
-  public RandomILP() {
+  public RealizeRandomILP() {
     random = new Random();
   }
 
@@ -31,16 +29,15 @@ public class RandomILP implements PointsRealization {
     n = orientations.getN();
     x = new long[n];
     y = new long[n];
-    ans = null;
+    Points ans = null;
 
     boolean XFixed = false;
     boolean solved = randomRealization(XFixed);
 //    boolean solved = randomRealization2(XFixed);
     if (solved) {
       ans = new Points(x, y);
-      return ans;
     }
-    return null;
+    return ans;
   }
 
   private void randomAssignment(long[] t, int bound) {
@@ -109,35 +106,9 @@ public class RandomILP implements PointsRealization {
         grbVars[i] = model.addVar(0, INF, 0.0, GRB.INTEGER, String.format("%s[%d]", str, i));
       }
 
-      // Set objective: maximize x + y + 2 z
-//      expr.addTerm(1.0, x); expr.addTerm(1.0, y); expr.addTerm(2.0, z);
-//      model.setObjective(expr, GRB.MAXIMIZE);
-
       // Add constraint: x + 2 y + 3 z <= 4
-
       long[] t = XFixed ? x : y;
-      for (int i = 0; i < n; i++) {
-        for (int j = i + 1; j < n; j++) {
-          for (int k = j + 1; k < n; k++) {
-            GRBLinExpr expr = new GRBLinExpr();
-
-            expr.addTerm(t[j], grbVars[i]);
-            expr.addTerm(-t[i], grbVars[j]);
-
-            expr.addTerm(t[i], grbVars[k]);
-            expr.addTerm(-t[k], grbVars[i]);
-
-            expr.addTerm(t[k], grbVars[j]);
-            expr.addTerm(-t[j], grbVars[k]);
-
-            char sense =
-                orientations.getOrderType(i, j, k) ^ XFixed ? GRB.GREATER_EQUAL : GRB.LESS_EQUAL;
-            double rhs = orientations.getOrderType(i, j, k) ^ XFixed ? EPSILON : -EPSILON;
-
-            model.addConstr(expr, sense, rhs, String.format("ccw_points_(%d,%d,%d)", i, j, k));
-          }
-        }
-      }
+      ConstraintBuilder.orientationsConstraints(model, grbVars, t, orientations, XFixed, EPSILON);
 
       if (OUTPUT_FLAG) {
         model.write(String.format("%s.mps", name));
@@ -147,10 +118,11 @@ public class RandomILP implements PointsRealization {
       // Optimize model
       model.optimize();
 
-      int optimStatus = model.get(GRB.IntAttr.Status);
+      int optimizationStatus = model.get(GRB.IntAttr.Status);
       double objVal;
-      boolean ans;
-      if (optimStatus == GRB.Status.OPTIMAL) {
+      boolean ans = false;
+
+      if (optimizationStatus == GRB.Status.OPTIMAL) {
         if (OUTPUT_FLAG) {
           model.write(String.format("%s.sol", name));
           objVal = model.get(GRB.DoubleAttr.ObjVal);
@@ -168,28 +140,9 @@ public class RandomILP implements PointsRealization {
         }
         assert orientations.isSameOrderType(new Points(x, y));
         ans = true;
-      } else if (optimStatus == GRB.Status.INF_OR_UNBD) {
-        if (OUTPUT_FLAG) {
-          System.out.println("Model is infeasible or unbounded");
-        }
-        ans = false;
-      } else if (optimStatus == GRB.Status.INFEASIBLE) {
-        if (OUTPUT_FLAG) {
-          System.out.println("Model is infeasible");
-        }
-        ans = false;
-      } else if (optimStatus == GRB.Status.UNBOUNDED) {
-        if (OUTPUT_FLAG) {
-          System.out.println("Model is unbounded");
-        }
-        ans = false;
-      } else {
-        if (OUTPUT_FLAG) {
-          System.out.println("Optimization was stopped with status = "
-              + optimStatus);
-        }
-        ans = false;
       }
+
+      ConstraintBuilder.debugSolution(optimizationStatus, OUTPUT_FLAG);
 
       // Dispose of model and environment
       model.dispose();
@@ -197,8 +150,7 @@ public class RandomILP implements PointsRealization {
       return ans;
 
     } catch (GRBException e) {
-      System.out.println("Error code: " + e.getErrorCode() + ". " +
-          e.getMessage());
+      System.out.println("Error code: " + e.getErrorCode() + ". " + e.getMessage());
       return false;
     }
 
