@@ -7,22 +7,27 @@ import gurobi.GRBException;
 import gurobi.GRBModel;
 import gurobi.GRBVar;
 import java.util.Arrays;
+import java.util.Random;
 
-public class RealizeQuadraticAlternative implements PointsRealization {
+public class RealizeQuadraticAlternativeStretch2 implements PointsRealization {
 
-  public static final String name = "RealizeQuadraticAlternative";
-  private static final double INF = 1 << 16;
-  private static final double EPSILON = 1.0 - 1e-1;
+  public static final String name = "RealizeQuadraticAlternativeStretch2";
+  private static final double INF = (1 << 16) - 1;
+  private static final double EPSILON = 0.1;
+//  private static final double EPSILON = 1.0 - 1e-1;
   private static final boolean OUTPUT_FLAG = false;
   private int n;
   private Orientations orientations;
   private long[] x;
   private long[] y;
-  private int TRY_NUM = 1_0;
+  private int TRY_NUM = 20;
+  private int TRY_NUM2 = 200;
 
-  public RealizeQuadraticAlternative() {}
+  Random random = new Random();
 
-  public RealizeQuadraticAlternative(int TRY_NUM) {
+  public RealizeQuadraticAlternativeStretch2() {}
+
+  public RealizeQuadraticAlternativeStretch2(int TRY_NUM) {
     this.TRY_NUM = TRY_NUM;
   }
 
@@ -33,28 +38,64 @@ public class RealizeQuadraticAlternative implements PointsRealization {
     y = new long[n];
     Points ans = null;
 
-    boolean XFixed = false;
-    boolean solved = alternativeRealization(XFixed);
-    if (solved) {
-      ans = new Points(x, y);
+    boolean XFixed = true;
+    for (int i = 0; i < TRY_NUM2; i++) {
+      if (i > 0) {
+        for (int j = 0; j < n; j++) {
+          y[j] = random.nextInt();
+          x[j] = random.nextInt();
+        }
+        Arrays.sort(x);
+      }
+      if (i == 0) TRY_NUM = 20;
+      else TRY_NUM = 6;
+      boolean solved = alternativeRealization(XFixed);
+      if (solved) {
+        ans = new Points(x, y);
+        System.err.printf("%s: Solved after %d trying!\n", name, i + 1);
+        return ans;
+//        break;
+      }
     }
+    System.err.printf("%s: Not found Solutions!\n", name);
+
     return ans;
   }
 
   public boolean alternativeRealization(boolean XFixed) {
-
-    Arrays.fill(x, 0);
-    Arrays.fill(y, 0);
+//    Arrays.fill(x, 0);
+//    Arrays.fill(y, 0);
 
     for (int i = 0; i < TRY_NUM; i++) {
       if (solve(XFixed)) {
-        System.err.printf("%s: Solved after %d trying!\n", name, i + 1);
+//        System.err.printf("%s: Solved after %d trying!\n", name, i + 1);
         return true;
       }
       XFixed = !XFixed;
     }
-    System.err.printf("%s: Not found Solutions!\n", name);
+//    System.err.printf("%s: Not found Solutions!\n", name);
     return false;
+  }
+
+  private void stretch(double[] t) {
+    double min = t[0];
+    double max = t[0];
+    for (int i = 1; i < t.length; i++) {
+      min = Math.min(min, t[i]);
+      max = Math.max(max, t[i]);
+    }
+
+    assert max > min;
+
+    double threshold = INF/10;
+    double rangeStart = 1.0 / 3.0 * INF;
+    double rangeEnd = 2.0 / 3.0 * INF;
+    if (max - min <= threshold) {
+      for (int i = 0; i < t.length; i++) {
+        t[i] = rangeStart +  ((t[i] - min) / (max - min)) * (rangeEnd - rangeStart);
+      }
+    }
+
   }
 
   private boolean solve(boolean XFixed) {
@@ -71,6 +112,8 @@ public class RealizeQuadraticAlternative implements PointsRealization {
       }
       // Set the integrality focus
 //      env.set(IntParam.IntegralityFocus, 1);
+//      env.set(DoubleParam.TimeLimit, 5);
+      env.set(IntParam.BarHomogeneous, 1);
       env.start();
 
       // Create empty model
@@ -85,6 +128,7 @@ public class RealizeQuadraticAlternative implements PointsRealization {
 
       // Add constraint: x + 2 y + 3 z <= 4
       if (XVar) {
+//        ConstraintBuilder.reverseOrderConstraints(model, grbVars);
         ConstraintBuilder.orderConstraints(model, grbVars);
       }
 
@@ -104,7 +148,7 @@ public class RealizeQuadraticAlternative implements PointsRealization {
       double objVal;
       boolean ans = false;
 
-      if (optimizationStatus == GRB.Status.OPTIMAL) {
+      if (optimizationStatus == GRB.Status.OPTIMAL || optimizationStatus == GRB.Status.SUBOPTIMAL) {
         if (OUTPUT_FLAG) {
           model.write(String.format("%s.sol", name));
           objVal = model.get(GRB.DoubleAttr.ObjVal);
@@ -112,10 +156,24 @@ public class RealizeQuadraticAlternative implements PointsRealization {
         }
 
         t = XVar ? x : y;
+
+        double[] tmpAns = new double[n];
+        for (int i = 0; i < n; i++) {
+          tmpAns[i] = grbVars[i].get(GRB.DoubleAttr.X);
+        }
+
+        stretch(tmpAns);
+
         for (int i = 0; i < n; i++) {
           //todo fix it
 //            t[i] = (long) grbVars[i].get(GRB.DoubleAttr.X);
-          t[i] = DoubleEpsilonCompare.integrality(grbVars[i].get(GRB.DoubleAttr.X));
+//          t[i] = DoubleEpsilonCompare.integrality(grbVars[i].get(GRB.DoubleAttr.X));
+//          if (optimizationStatus == Status.SUBOPTIMAL)
+          t[i] = DoubleEpsilonCompare.integrality(tmpAns[i]);
+
+          if (OUTPUT_FLAG)
+            System.out.printf("x[%d] = %d y[%d] = %d %f\n", i, x[i], i, y[i],
+                grbVars[i].get(GRB.DoubleAttr.X));
         }
         ans = orientations.isSameOrderType(new Points(x, y));
       }

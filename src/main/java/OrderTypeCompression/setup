@@ -1,0 +1,48 @@
+# ----------------------------------------------------------------------
+Install Gurobi:
+
+1) untar files
+tar xvfz gurobi_server9.1.0_linux64.tar.gz
+2) copy to /opt/gurobi_server910/linux64
+3) add to .bashrc or .bash_profile or .profile file
+export GUROBI_HOME="/opt/gurobi911/linux64"
+export PATH="${PATH}:${GUROBI_HOME}/bin"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib"
+export GRB_LICENSE_FILE="$HOME/gurobi.lic"
+4) academic license registration
+grbgetkey
+5)
+
+
+# ----------------------------------------------------------------------
+Intellij & Maven:
+
+Module dependencies﻿
+https://www.jetbrains.com/help/idea/working-with-module-dependencies.html
+
+Maven dependencies﻿
+https://mvnrepository.com/artifact/gurobi
+
+<!-- https://mvnrepository.com/artifact/gurobi/gurobi -->
+<dependency>
+    <groupId>gurobi</groupId>
+    <artifactId>gurobi</artifactId>
+    <version>9.1.1</version>
+</dependency>
+
+How to add local jar files to a Maven project?
+https://stackoverflow.com/questions/4955635/how-to-add-local-jar-files-to-a-maven-project
+mvn install:install-file -Dfile=/opt/gurobi911/linux64/lib/gurobi.jar -DgroupId=gurobi -DartifactId=gurobi -Dversion=9.1.1 -Dpackaging=jar -DgeneratePom=true
+
+# ----------------------------------------------------------------------
+Run Java:
+
+Run jar file
+java --module-path /home/mxh172930/gurobi911/linux64/lib --add-modules gurobi -cp Research-20210423_003354.jar OrderTypeCompression.SandBox
+java -cp Research-20210423_003354.jar --module-path /home/mxh172930/gurobi911/linux64/lib --add-modules gurobi OrderTypeCompression.SandBox
+java -cp Research-20210423_003354.jar --add-modules gurobi --module-path /home/mxh172930/gurobi911/linux64/lib OrderTypeCompression.SandBox
+java --add-modules gurobi --module-path /home/mxh172930/gurobi911/linux64/lib -cp Research-20210423_003354.jar OrderTypeCompression.SandBox
+
+Run jar with dependencies﻿file
+java -cp filename.jar package.class
+

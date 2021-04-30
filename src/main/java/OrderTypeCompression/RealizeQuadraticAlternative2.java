@@ -8,9 +8,9 @@ import gurobi.GRBModel;
 import gurobi.GRBVar;
 import java.util.Arrays;
 
-public class RealizeQuadraticAlternative implements PointsRealization {
+public class RealizeQuadraticAlternative2 implements PointsRealization {
 
-  public static final String name = "RealizeQuadraticAlternative";
+  public static final String name = "RealizeQuadraticAlternative2";
   private static final double INF = 1 << 16;
   private static final double EPSILON = 1.0 - 1e-1;
   private static final boolean OUTPUT_FLAG = false;
@@ -20,17 +20,45 @@ public class RealizeQuadraticAlternative implements PointsRealization {
   private long[] y;
   private int TRY_NUM = 1_0;
 
-  public RealizeQuadraticAlternative() {}
+  GRBEnv env;
 
-  public RealizeQuadraticAlternative(int TRY_NUM) {
+  public RealizeQuadraticAlternative2(int n) {
+    this.n = n;
+    x = new long[n];
+    y = new long[n];
+
+    initialize();
+  }
+
+  public RealizeQuadraticAlternative2(int n, int TRY_NUM) {
+    this(n);
     this.TRY_NUM = TRY_NUM;
   }
 
+  public void initialize() {
+    try {
+      // Create empty environment, set options, and start
+      env = new GRBEnv(true);
+      if (OUTPUT_FLAG) {
+        env.set("logFile", String.format("%s.log", name));
+      } else {
+        env.set(IntParam.OutputFlag, 0);
+      }
+      // Set the integrality focus
+//      env.set(IntParam.IntegralityFocus, 1);
+      env.start();
+
+    } catch (GRBException e) {
+      System.out.println("Error code: " + e.getErrorCode() + ". " + e.getMessage());
+    }
+  }
+
   public Points solve(Orientations orientations) {
+    assert n == orientations.getN();
     this.orientations = orientations;
-    n = orientations.getN();
-    x = new long[n];
-    y = new long[n];
+//    n = orientations.getN();
+//    x = new long[n];
+//    y = new long[n];
     Points ans = null;
 
     boolean XFixed = false;
@@ -62,18 +90,9 @@ public class RealizeQuadraticAlternative implements PointsRealization {
     boolean XVar = !XFixed;
     try {
 
-      // Create empty environment, set options, and start
-      GRBEnv env = new GRBEnv(true);
-      if (OUTPUT_FLAG) {
-        env.set("logFile", String.format("%s.log", name));
-      } else {
-        env.set(IntParam.OutputFlag, 0);
-      }
-      // Set the integrality focus
-//      env.set(IntParam.IntegralityFocus, 1);
-      env.start();
-
       // Create empty model
+//      GRBModel model = new GRBModel(env);
+
       GRBModel model = new GRBModel(env);
 
       // Create variables
@@ -124,7 +143,6 @@ public class RealizeQuadraticAlternative implements PointsRealization {
 
       // Dispose of model and environment
       model.dispose();
-      env.dispose();
       return ans;
 
     } catch (GRBException e) {

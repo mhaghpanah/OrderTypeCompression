@@ -78,7 +78,8 @@ public class Orientations {
     for (int i = 0; i < n; i++) {
       for (int j = i + 1; j < n; j++) {
         for (int k = j + 1; k < n; k++) {
-          int orientation = Points.orientation(other.get(i), other.get(j), other.get(k));
+//          int orientation = Points.orientation(other.get(i), other.get(j), other.get(k));
+          int orientation = Point.ccw(other.get(i), other.get(j), other.get(k));
           if (orientation == 0 || orientations[i][j][k] != orientation) {
             return false;
           }
@@ -92,7 +93,8 @@ public class Orientations {
     for (int i = 0; i < n; i++) {
       for (int j = i + 1; j < n; j++) {
         for (int k = j + 1; k < n; k++) {
-          int orientation = Points.orientation(points.get(i), points.get(j), points.get(k));
+//          int orientation = Points.orientation(points.get(i), points.get(j), points.get(k));
+          int orientation = Point.ccw(points.get(i), points.get(j), points.get(k));
 
           orientations[i][j][k] = orientation;
 
@@ -100,7 +102,9 @@ public class Orientations {
             System.out.println(points.get(i));
             System.out.println(points.get(j));
             System.out.println(points.get(k));
-            System.out.println(Points.orientation(points.get(i), points.get(j), points.get(k)));
+//            System.out.println(Points.orientation(points.get(i), points.get(j), points.get(k)));
+            System.out.println(Point.ccw(points.get(i), points.get(j), points.get(k)));
+
           }
           assert orientation == -1 || orientation == 1;
           orderType[i][j][k] = orientation == 1;

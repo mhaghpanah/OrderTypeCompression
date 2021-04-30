@@ -10,7 +10,7 @@ import java.util.Random;
 
 public class RealizeRandomILP implements PointsRealization {
 
-  public static final String name = "RandomILP";
+  public static final String name = "RealizeRandomILP";
   private static double INF = 1 << 16;
   private static final double EPSILON = 1.0 - 1e-1;
   private static final boolean OUTPUT_FLAG = false;
@@ -19,9 +19,16 @@ public class RealizeRandomILP implements PointsRealization {
   private Orientations orientations;
   private long[] x;
   private long[] y;
+  private int TRY_NUM = Integer.MAX_VALUE;
+
 
   public RealizeRandomILP() {
     random = new Random();
+  }
+
+  public RealizeRandomILP(int TRY_NUM) {
+    this();
+    this.TRY_NUM = TRY_NUM;
   }
 
   public Points solve(Orientations orientations) {
@@ -47,7 +54,6 @@ public class RealizeRandomILP implements PointsRealization {
   }
 
   public boolean randomRealization(boolean XFixed) {
-    int TRY_NUM = 10_000;
     for (int i = 0; i < TRY_NUM; i++) {
       randomAssignment(x, (int) INF);
       randomAssignment(y, (int) INF);

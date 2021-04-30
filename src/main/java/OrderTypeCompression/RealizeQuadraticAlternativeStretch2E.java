@@ -1,16 +1,18 @@
 package OrderTypeCompression;
 
 import gurobi.GRB;
+import gurobi.GRB.DoubleParam;
 import gurobi.GRB.IntParam;
 import gurobi.GRBEnv;
 import gurobi.GRBException;
 import gurobi.GRBModel;
 import gurobi.GRBVar;
 import java.util.Arrays;
+import java.util.Random;
 
-public class RealizeQuadraticAlternativeStretch implements PointsRealization {
+public class RealizeQuadraticAlternativeStretch2E implements PointsRealization {
 
-  public static final String name = "RealizeQuadraticAlternativeStretch";
+  public static final String name = "RealizeQuadraticAlternativeStretch2";
   private static final double INF = (1 << 16) - 1;
   private static final double EPSILON = 0.1;
 //  private static final double EPSILON = 1.0 - 1e-1;
@@ -19,11 +21,16 @@ public class RealizeQuadraticAlternativeStretch implements PointsRealization {
   private Orientations orientations;
   private long[] x;
   private long[] y;
-  private int TRY_NUM = 2_00;
+  private int TRY_NUM = 20;
+  private int TRY_NUM2 = 200;
 
-  public RealizeQuadraticAlternativeStretch() {}
+  private static final long[][] hints = new long[][] {{},{},{},{65535,32768,0},{65535,41158,24377,0},{65535,45125,32767,20410,0},{65535,47512,37298,28237,18023,0},{65535,49143,40229,32767,25306,16392,0},{65535,50344,42317,35835,29700,23218,15191,0},{65535,51265,43887,38082,32768,27453,21648,14270,0},{65535,51998,45119,39811,35064,30471,25724,20416,13537,0},{65535,52598,46118,41190,36860,32768,28675,24345,19417,12937,0},{65535,53111,46958,42330,38318,34589,30946,27217,23205,18577,12424,0}};
 
-  public RealizeQuadraticAlternativeStretch(int TRY_NUM) {
+  Random random = new Random(1);
+
+  public RealizeQuadraticAlternativeStretch2E() {}
+
+  public RealizeQuadraticAlternativeStretch2E(int TRY_NUM) {
     this.TRY_NUM = TRY_NUM;
   }
 
@@ -34,26 +41,52 @@ public class RealizeQuadraticAlternativeStretch implements PointsRealization {
     y = new long[n];
     Points ans = null;
 
-    boolean XFixed = false;
-    boolean solved = alternativeRealization(XFixed);
-    if (solved) {
-      ans = new Points(x, y);
+    boolean XFixed = true;
+    for (int i = 0; i < TRY_NUM2; i++) {
+      if (i == 0) {
+        for (int j = 0; j < n; j++) {
+          x[j] = hints[n][j];
+          y[j] = hints[n][j];
+        }
+        TRY_NUM = 0;
+      } else if (i == 1) {
+        Arrays.fill(x, 0);
+        Arrays.fill(y, 0);
+        TRY_NUM = 0;
+      } else if (i > 1) {
+        for (int j = 0; j < n; j++) {
+          y[j] = random.nextInt();
+          x[j] = random.nextInt();
+        }
+        Arrays.sort(x);
+        Arrays.sort(y);
+        TRY_NUM = 2;
+      }
+      boolean solved = alternativeRealization(XFixed);
+      if (solved) {
+        ans = new Points(x, y);
+        System.err.printf("%s: Solved after %d trying!\n", name, i + 1);
+        return ans;
+//        break;
+      }
     }
+    System.err.printf("%s: Not found Solutions!\n", name);
+
     return ans;
   }
 
   public boolean alternativeRealization(boolean XFixed) {
-    Arrays.fill(x, 0);
-    Arrays.fill(y, 0);
+//    Arrays.fill(x, 0);
+//    Arrays.fill(y, 0);
 
     for (int i = 0; i < TRY_NUM; i++) {
       if (solve(XFixed)) {
-        System.err.printf("%s: Solved after %d trying!\n", name, i + 1);
+        System.err.printf("%s: Solved after %d iterations!\n", name, i + 1);
         return true;
       }
       XFixed = !XFixed;
     }
-    System.err.printf("%s: Not found Solutions!\n", name);
+//    System.err.printf("%s: Not found Solutions!\n", name);
     return false;
   }
 
@@ -92,7 +125,7 @@ public class RealizeQuadraticAlternativeStretch implements PointsRealization {
       }
       // Set the integrality focus
 //      env.set(IntParam.IntegralityFocus, 1);
-//      env.set(DoubleParam.TimeLimit, 5);
+      env.set(DoubleParam.TimeLimit, 0.2);
       env.set(IntParam.BarHomogeneous, 1);
       env.start();
 
@@ -108,12 +141,13 @@ public class RealizeQuadraticAlternativeStretch implements PointsRealization {
 
       // Add constraint: x + 2 y + 3 z <= 4
       if (XVar) {
-        ConstraintBuilder.reverseOrderConstraints(model, grbVars);
+//        ConstraintBuilder.reverseOrderConstraints(model, grbVars);
+        ConstraintBuilder.orderConstraints(model, grbVars);
       }
 
       long[] t = XFixed ? x : y;
       ConstraintBuilder.orientationsConstraints(model, grbVars, t, orientations, XFixed, EPSILON);
-      model.feasRelax(GRB.FEASRELAX_QUADRATIC, false, false, true);
+      model.feasRelax(GRB.FEASRELAX_LINEAR, false, false, true);
 
       if (OUTPUT_FLAG) {
         model.write(String.format("%s.mps", name));
